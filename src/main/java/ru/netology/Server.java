@@ -1,9 +1,15 @@
 package ru.netology;
 
+import org.apache.http.NameValuePair;
+import org.apache.http.client.utils.URLEncodedUtils;
+
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -65,7 +71,28 @@ class Server {
         final var parts = requestLine.split(" ");
         if (parts.length != 3) return null;
         final var method = parts[0];
-        final var path = parts[1];
+        final var fullPath = parts[1];
+
+        String path;
+        Map<String, List<String>> queryParams = new HashMap<>();
+        int queryStart = fullPath.indexOf('?');
+
+        if (queryStart >= 0) {
+            path = fullPath.substring(0, queryStart);
+            String queryString = fullPath.substring(queryStart + 1);
+
+            List<NameValuePair> params = URLEncodedUtils.parse(
+                    queryString,
+                    StandardCharsets.UTF_8
+            );
+
+            for (NameValuePair param : params) {
+                queryParams.computeIfAbsent(param.getName(), k -> new ArrayList<>())
+                        .add(param.getValue());
+            }
+        } else {
+            path = fullPath;
+        }
 
         final var headers = new HashMap<String, String>();
         String headerLine;
@@ -87,7 +114,7 @@ class Server {
             }
         }
 
-        return new Request(method, path, headers, body);
+        return new Request(method, path, headers, body, queryParams);
     }
 
     private void sendNotFound(BufferedOutputStream out) throws IOException {
